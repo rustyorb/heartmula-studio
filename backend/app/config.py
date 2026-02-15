@@ -15,10 +15,10 @@ class Settings(BaseSettings):
     lazy_load: bool = True  # Required for 12GB VRAM
 
     # Generation defaults
-    default_max_length_ms: int = 240000
+    default_max_length_ms: int = 60000  # 60s (safe for 12GB VRAM with seq_len=1024)
     default_temperature: float = 1.0
     default_topk: int = 50
-    default_cfg_scale: float = 1.5
+    default_cfg_scale: float = 1.0  # 1.0 for 12GB VRAM (cfg>1 doubles batch size)
 
     # Storage
     output_dir: str = "data/outputs"

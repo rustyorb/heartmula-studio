@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
     # Load model and broadcast status
     try:
         async def model_progress(progress, msg):
-            await app.state.broadcaster.broadcast("model:loading", {"progress": progress, "message": msg})
+            await app.state.broadcaster.broadcast("model:loading_progress", {"progress": progress, "message": msg})
         await app.state.pipeline.load_generation_model(progress_callback=model_progress)
         await app.state.broadcaster.broadcast("model:ready", {"state": "ready"})
     except Exception as e:

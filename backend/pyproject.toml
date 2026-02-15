@@ -1,7 +1,7 @@
 [project]
 name = "heartmula-studio-backend"
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.13"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
@@ -11,6 +11,7 @@ dependencies = [
     "alembic>=1.14.0",
     "python-multipart>=0.0.12",
     "sse-starlette>=2.1.0",
+    "heartlib",
 ]
 
 [project.optional-dependencies]
@@ -18,4 +19,30 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24.0",
     "httpx>=0.27.0",
+]
+
+[tool.uv.sources]
+heartlib = { git = "https://github.com/HeartMuLa/heartlib.git" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources.torch]
+index = "pytorch-cu128"
+
+[tool.uv.sources.torchvision]
+index = "pytorch-cu128"
+
+[tool.uv.sources.torchaudio]
+index = "pytorch-cu128"
+
+# Override heartlib's pinned PyTorch versions to support RTX 5070 Ti (sm_120)
+[tool.uv]
+override-dependencies = [
+    "torch>=2.7.0",
+    "torchvision>=0.22.0",
+    "torchaudio>=2.7.0",
+    "numpy>=2.0.2",
 ]

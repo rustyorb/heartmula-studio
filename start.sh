@@ -67,6 +67,7 @@ mkdir -p "$SCRIPT_DIR/backend/data/outputs" "$SCRIPT_DIR/backend/data/uploads"
 # Start backend
 echo -e "${BOLD}Starting backend...${NC}"
 cd "$SCRIPT_DIR/backend"
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
 uv run uvicorn app.main:app --host "$BACKEND_HOST" --port "$BACKEND_PORT" \
     > "$SCRIPT_DIR/.backend.log" 2>&1 &
 BACKEND_PID=$!
@@ -74,17 +75,24 @@ echo "$BACKEND_PID" > "$PIDFILE_BACKEND"
 
 # Wait for backend to be ready
 echo -n "  Waiting for backend"
-for i in $(seq 1 30); do
+for i in $(seq 1 120); do
     if curl -sf "http://127.0.0.1:$BACKEND_PORT/api/health" > /dev/null 2>&1; then
         echo ""
         echo -e "  ${GREEN}✓${NC} Backend running (PID $BACKEND_PID)"
         break
     fi
-    echo -n "."
-    sleep 1
-    if [ "$i" -eq 30 ]; then
+    # Check if process died
+    if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
         echo ""
-        echo -e "  ${RED}✗ Backend failed to start. Check .backend.log${NC}"
+        echo -e "  ${RED}✗ Backend process died. Check .backend.log${NC}"
+        rm -f "$PIDFILE_BACKEND"
+        exit 1
+    fi
+    echo -n "."
+    sleep 2
+    if [ "$i" -eq 120 ]; then
+        echo ""
+        echo -e "  ${RED}✗ Backend timed out. Check .backend.log${NC}"
         kill "$BACKEND_PID" 2>/dev/null
         rm -f "$PIDFILE_BACKEND"
         exit 1

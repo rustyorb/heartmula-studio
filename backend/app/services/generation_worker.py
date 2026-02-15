@@ -120,19 +120,24 @@ class GenerationWorker:
                 await asyncio.sleep(1)
 
     async def _run_generation(self, job) -> Path:
-        """Run HeartMuLa pipeline with progress reporting."""
+        """Run HeartMuLa pipeline with progress reporting via tqdm hook."""
         output_path = self.storage.get_output_path(job.id)
+        loop = asyncio.get_running_loop()
 
-        async def progress_callback(step: int, total: int):
+        def progress_callback(step: int, total: int):
+            """Called from generation thread by the tqdm ProgressHook."""
             progress = step / total if total > 0 else 0
-            await self.broadcaster.broadcast("job:progress", {
-                "job_id": job.id,
-                "step": step,
-                "total_steps": total,
-                "progress": progress,
-            })
+            # Schedule the async broadcast from the worker thread
+            asyncio.run_coroutine_threadsafe(
+                self.broadcaster.broadcast("job:progress", {
+                    "job_id": job.id,
+                    "step": step,
+                    "total_steps": total,
+                    "progress": progress,
+                }),
+                loop,
+            )
 
-        # Run generation (uses mock pipeline for now)
         await self.pipeline.generate(
             lyrics=job.lyrics,
             tags=job.tags,
@@ -141,9 +146,7 @@ class GenerationWorker:
             temperature=job.temperature,
             topk=job.topk,
             cfg_scale=job.cfg_scale,
-            progress_callback=lambda step, total: asyncio.get_event_loop().create_task(
-                progress_callback(step, total)
-            ),
+            progress_callback=progress_callback,
         )
         return output_path
 

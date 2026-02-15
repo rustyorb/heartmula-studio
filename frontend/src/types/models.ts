@@ -48,7 +48,7 @@ export interface GpuStatus {
   use_mmgp: boolean;
 }
 
-export type ModelState = "unloaded" | "loading" | "ready" | "error";
+export type ModelState = "unloaded" | "downloading" | "loading" | "ready" | "generating" | "error";
 
 export interface HealthStatus {
   status: string;

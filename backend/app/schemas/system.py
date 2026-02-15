@@ -17,6 +17,6 @@ class GpuStatusResponse(BaseModel):
 
 
 class ModelStatusResponse(BaseModel):
-    state: str  # unloaded | loading | ready | error
+    state: str  # unloaded | downloading | loading | ready | generating | error
     progress: Optional[float] = None
     message: Optional[str] = None

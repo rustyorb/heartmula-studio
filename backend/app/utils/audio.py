@@ -1,20 +1,22 @@
+import subprocess
 from pathlib import Path
 from typing import Optional
 
 
 def get_audio_duration_ms(path: Path) -> Optional[int]:
-    """Get audio duration in milliseconds using torchaudio if available."""
+    """Get audio duration in milliseconds using ffprobe."""
     try:
-        import torchaudio
-        info = torchaudio.info(str(path))
-        duration_s = info.num_frames / info.sample_rate
-        return int(duration_s * 1000)
-    except (ImportError, RuntimeError):
+        result = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+            capture_output=True, text=True, check=True,
+        )
+        return int(float(result.stdout.strip()) * 1000)
+    except Exception:
         pass
-    # Fallback: estimate from file size (48kHz, 16-bit stereo ~ 192KB/s for MP3)
+    # Fallback: estimate from file size (~192kbps MP3 = 24KB/s)
     try:
         size = path.stat().st_size
-        # Rough MP3 estimate: ~128kbps = 16KB/s
-        return int(size / 16 * 1000 / 1000)
+        return int(size / 24 * 1000 / 1000)
     except OSError:
         return None
