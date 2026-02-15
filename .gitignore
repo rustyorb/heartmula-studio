@@ -5,8 +5,9 @@ __pycache__/
 .venv/
 venv/
 
-# Backend data
+# Backend data & models
 backend/data/
+backend/models/
 backend/*.db
 
 # Node
