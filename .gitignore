@@ -23,6 +23,12 @@ out/
 .env
 .env.local
 
+# Runtime
+.backend.pid
+.frontend.pid
+.backend.log
+.frontend.log
+
 # OS
 .DS_Store
 Thumbs.db
