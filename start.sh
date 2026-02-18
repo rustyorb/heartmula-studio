@@ -56,9 +56,14 @@ echo -e "  ${GREEN}✓${NC} pnpm $(pnpm --version 2>/dev/null)"
 echo ""
 
 # Ensure dependencies are installed
-echo -e "${BOLD}Installing dependencies (if needed)...${NC}"
-(cd "$SCRIPT_DIR/backend" && uv sync --quiet 2>/dev/null) && echo -e "  ${GREEN}✓${NC} Backend dependencies"
-(cd "$SCRIPT_DIR/frontend" && pnpm install --silent 2>/dev/null) && echo -e "  ${GREEN}✓${NC} Frontend dependencies"
+echo -e "${BOLD}Installing backend dependencies...${NC}"
+echo -e "  ${YELLOW}(This may take a while on first run — PyTorch is ~2GB)${NC}"
+(cd "$SCRIPT_DIR/backend" && uv sync)
+echo -e "  ${GREEN}✓${NC} Backend dependencies"
+echo ""
+echo -e "${BOLD}Installing frontend dependencies...${NC}"
+(cd "$SCRIPT_DIR/frontend" && pnpm install)
+echo -e "  ${GREEN}✓${NC} Frontend dependencies"
 echo ""
 
 # Create data directories
@@ -74,25 +79,34 @@ BACKEND_PID=$!
 echo "$BACKEND_PID" > "$PIDFILE_BACKEND"
 
 # Wait for backend to be ready
-echo -n "  Waiting for backend"
+echo -e "  Waiting for backend (loading model, may take 1-2 min)..."
+ELAPSED=0
 for i in $(seq 1 120); do
     if curl -sf "http://127.0.0.1:$BACKEND_PORT/api/health" > /dev/null 2>&1; then
-        echo ""
-        echo -e "  ${GREEN}✓${NC} Backend running (PID $BACKEND_PID)"
+        echo -e "  ${GREEN}✓${NC} Backend running (PID $BACKEND_PID) — ready in ${ELAPSED}s"
         break
     fi
     # Check if process died
     if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
-        echo ""
-        echo -e "  ${RED}✗ Backend process died. Check .backend.log${NC}"
+        echo -e "  ${RED}✗ Backend process died after ${ELAPSED}s${NC}"
+        echo -e "  ${RED}  Last log lines:${NC}"
+        tail -5 "$SCRIPT_DIR/.backend.log" 2>/dev/null | sed 's/^/    /'
         rm -f "$PIDFILE_BACKEND"
         exit 1
     fi
-    echo -n "."
+    # Show last log line periodically so user knows it's working
+    if [ $((i % 5)) -eq 0 ]; then
+        LAST_LINE=$(tail -1 "$SCRIPT_DIR/.backend.log" 2>/dev/null | cut -c1-80)
+        if [ -n "$LAST_LINE" ]; then
+            echo -e "  ${CYAN}[${ELAPSED}s]${NC} $LAST_LINE"
+        fi
+    fi
     sleep 2
+    ELAPSED=$((ELAPSED + 2))
     if [ "$i" -eq 120 ]; then
-        echo ""
-        echo -e "  ${RED}✗ Backend timed out. Check .backend.log${NC}"
+        echo -e "  ${RED}✗ Backend timed out after ${ELAPSED}s${NC}"
+        echo -e "  ${RED}  Last log lines:${NC}"
+        tail -5 "$SCRIPT_DIR/.backend.log" 2>/dev/null | sed 's/^/    /'
         kill "$BACKEND_PID" 2>/dev/null
         rm -f "$PIDFILE_BACKEND"
         exit 1

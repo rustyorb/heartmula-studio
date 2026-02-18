@@ -37,16 +37,12 @@ if %errorlevel% neq 0 (
 echo   [OK] pnpm found
 echo.
 
-:: Check for existing processes
-if exist "%SCRIPT_DIR%.backend.pid" (
-    set /p BACKEND_PID=<"%SCRIPT_DIR%.backend.pid"
-    tasklist /FI "PID eq !BACKEND_PID!" 2>nul | find /I "!BACKEND_PID!" >nul
-    if !errorlevel! equ 0 (
-        echo   [WARN] Backend is already running ^(PID !BACKEND_PID!^)
-        echo   Run stop.bat first to restart.
-        pause
-        exit /b 1
-    )
+:: Check for existing processes on our ports
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%BACKEND_PORT%.*LISTENING" 2^>nul') do (
+    echo   [WARN] Port %BACKEND_PORT% is already in use ^(PID %%a^)
+    echo   Run stop.bat first to restart.
+    pause
+    exit /b 1
 )
 
 :: Install dependencies
@@ -66,25 +62,20 @@ if not exist "%SCRIPT_DIR%backend\data\uploads" mkdir "%SCRIPT_DIR%backend\data\
 :: Start backend
 echo   Starting backend...
 cd /d "%SCRIPT_DIR%backend"
-start /B "HeartMuLa-Backend" cmd /c "uv run uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% > "%SCRIPT_DIR%.backend.log" 2>&1"
-
-:: Get backend PID (approximate — find uvicorn process)
-timeout /t 3 /nobreak >nul
-for /f "tokens=2" %%a in ('tasklist /FI "WINDOWTITLE eq HeartMuLa-Backend" /NH 2^>nul ^| find /I "cmd"') do (
-    echo %%a> "%SCRIPT_DIR%.backend.pid"
-)
+set PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+start "" /B cmd /c "uv run uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% >..\.backend.log 2>&1"
 
 :: Wait for backend health check
 echo   Waiting for backend...
 set READY=0
-for /L %%i in (1,1,20) do (
+for /L %%i in (1,1,30) do (
     if !READY! equ 0 (
         curl -sf "http://127.0.0.1:%BACKEND_PORT%/api/health" >nul 2>&1
         if !errorlevel! equ 0 (
             set READY=1
             echo   [OK] Backend running on port %BACKEND_PORT%
         ) else (
-            timeout /t 1 /nobreak >nul
+            timeout /t 2 /nobreak >nul
         )
     )
 )
@@ -94,12 +85,22 @@ if %READY% equ 0 (
     exit /b 1
 )
 
+:: Save backend PID
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%BACKEND_PORT%.*LISTENING" 2^>nul') do (
+    echo %%a> "%SCRIPT_DIR%.backend.pid"
+)
+
 :: Start frontend
 echo   Starting frontend...
 cd /d "%SCRIPT_DIR%frontend"
-start /B "HeartMuLa-Frontend" cmd /c "pnpm dev --port %FRONTEND_PORT% > "%SCRIPT_DIR%.frontend.log" 2>&1"
+start "" /B cmd /c "pnpm dev --port %FRONTEND_PORT% >..\.frontend.log 2>&1"
 
 timeout /t 5 /nobreak >nul
+
+:: Save frontend PID
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%FRONTEND_PORT%.*LISTENING" 2^>nul') do (
+    echo %%a> "%SCRIPT_DIR%.frontend.pid"
+)
 
 :: Get local IP
 for /f "tokens=2 delims=:" %%a in ('ipconfig ^| find /I "IPv4"') do (
